@@ -1,0 +1,79 @@
+<script>
+class Presser {
+    constructor() {
+        this._formats = new Map([['gzip', {alias:'g gz'.split(' ')}], ['deflate', {alias:'d zlib'.split(' ')}], ['deflate-raw',{alias:'r raw'.split(' ')}]]);
+        this.#makePresser();
+        this._useFormat = this._formats.has('deflate') ? 'deflate' : '';
+    }
+    get useFormat() {return this._useFormat}
+    set useFormat(f) {
+        if (this._formats.has(f) && this._formats.get(f).isSupported){
+            if (this._formats.get(f).isSupported){this._useFormat=f}
+            throw new TypeError(`${f} はこのブラウザにおいて未実装です。`)
+        }
+        throw new TypeError(`${f} はこのライブラリにおいて非対応です。`)
+    }
+    get useCompress() {return this._formats.get(this._useFormat).compress}
+    get useDecompress() {return this._formats.get(this._useFormat).decompress}
+    get formats() {return [...this._formats.keys()].map(k=>({name:k, ...this._formats.get(k)}))}
+    get supportedFormats() {return [...this._formats.keys()].filter(k=>this._formats.get(k).isSupported).map(k=>({name:k, ...this._formats.get(k)}))};
+    get unsupportedFormats() {return [...this._formats.keys()].filter(k=>!this._formats.get(k).isSupported).map(k=>({name:k, ...this._formats.get(k)}))}
+    get formatNames() {return [...this._formats.keys()]}
+    get supportedFormatNames() {return this.supportedFormats.map(o=>o.name)}
+    get unsupportedFormatNames() {return this.unsupportedFormats.map(o=>o.name)}
+    get formatAlias() {return this.formats.map(o=>[o.names, o.alias])}
+    get supportedFormatAlias() {return this.supportedFormats.map(o=>[o.name, o.alias])}
+    get unsupportedFormatAlias() {return this.unsupportedFormats.map(o=>[o.name, o.alias])}
+    #makePresser() {
+        for (let key of this._formats.keys()) {
+            const o = this._formats.get(key);
+            o.compress = this.#newPresser(CompressionStream, key);
+            o.decompress = this.#newPresser(DecompressionStream, key);
+            o.isSupported = !!o.compress && !!o.decompress;
+//            this._formats.get(key).compress = this.#newPresser(CompressionStream, key)
+//            this._formats.get(key).decompress = this.#newPresser(DecompressionStream, key)
+//            this._formats
+        }
+    }
+    #newPresser(cls, format) {try {return new cls(format);}catch (e) {console.error(e); return null;}}
+}
+
+/*
+class Presser {
+    constructor() {
+        this._formats = new Map([['gzip', {alias:'g gz'.split(' ')}], ['deflate', {alias:'d zlib'.split(' ')}], ['deflate-raw',{alias:'r raw'.split(' ')}]]);
+        this.#makePresser();
+        this._useFormat = this._formats.has('deflate') ? 'deflate' : '';
+    }
+    get useFormat() {return this._useFormat}
+    set useFormat(f) {
+        if (this._formats.has(f) && this._formats.get(f).isSupported){
+            if (this._formats.get(f).isSupported){this._useFormat=f}
+            throw new TypeError(`${f} はこのブラウザにおいて未実装です。`)
+        }
+        throw new TypeError(`${f} はこのライブラリにおいて非対応です。`)
+    }
+    get formats() {return [...this._formats.keys()].map(k=>({name:k, ...this._formats.get(k)}))}
+    get supportedFormats() {return [...this._formats.keys()].filter(k=>this._formats.get(k).isSupported).map(k=>({name:k, ...this._formats.get(k)}))};
+    get unsupportedFormats() {return [...this._formats.keys()].filter(k=>!this._formats.get(k).isSupported).map(k=>({name:k, ...this._formats.get(k)}))}
+    get formatNames() {return [...this._formats.keys()]}
+    get supportedFormatNames() {return this.supportedFormats.map(o=>o.name)}
+    get unsupportedFormatNames() {return this.unsupportedFormats.map(o=>o.name)}
+    get formatAlias() {return this.formats.map(o=>[o.names, o.alias])}
+    get supportedFormatAlias() {return this.supportedFormats.map(o=>[o.name, o.alias])}
+    get unsupportedFormatAlias() {return this.unsupportedFormats.map(o=>[o.name, o.alias])}
+    #makePresser() {
+        for (let key of this._formats.keys()) {
+            const o = this._formats.get(key);
+            o.compress = this.#newPresser(CompressionStream, key);
+            o.decompress = this.#newPresser(DecompressionStream, key);
+            o.isSupported = !!o.compress && !!o.decompress;
+//            this._formats.get(key).compress = this.#newPresser(CompressionStream, key)
+//            this._formats.get(key).decompress = this.#newPresser(DecompressionStream, key)
+//            this._formats
+        }
+    }
+    #newPresser(cls, format) {try {return new cls(format);}catch (e) {console.error(e); return null;}}
+}
+*/
+</script>
