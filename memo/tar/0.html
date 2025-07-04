@@ -1,0 +1,133 @@
+<script>
+window.addEventListener('DOMContentLoaded', async(event)=>{
+// polifill
+Blob.prototype.bytes ??= async function() {return new Uint8Array(await this.arrayBuffer());}
+// https://qiita.com/dojyorin/items/2cbd8692a8364310dc7d
+class TarV7 {
+    static BLOCK_SIZE = 512;
+    constructor() {
+        this._files = [];
+    }
+    #isStr(v){return 'string'===typeof v || v instanceof String}
+    clear() {this._files.length=0}
+    isUniqueName(name) {return 0===this._files.filter(file=>name===file.name).length}
+    throwUniqueName(name){if(!isUniqueName(name)){throw new TypeError(`ファイル名が既存と重複しました。:${name}`)}}
+    renameFile(oldName, newName) {
+        const i = this._files.findIndex(file=>oldName===file.name);
+        if (-1===i) {throw new TypeError(`第一引数は既存名のみ有効です。:${oldName}`)}
+        if (!this.isUniqueName(newName)) {throw new TypeError(`第二引数は未存名のみ有効です。:${newName}`)}
+        this._files[i] = new File(this._files[i], newName);
+    }
+    addFile(blob, fileName, lastModified) {// fileName:'directory/file.ext'), lastModified:Date.now() miliSec Number
+        if (blob instanceof File) {
+            this._files.push(fileName ? (new File(blob, fileName, {lastModified:file.lastModified})) : blob);
+        }
+        else if (blob instanceof Blob) {
+            if (!this.#isStr(fileName)){throw new TypeError(`ファイル名不足です。第一引数がBlobなら第二引数にファイル名を指定してください。`)}
+            const options = Number.isSafeInteger(lastModified) ? {lastModified:lastModified} : undefined;
+            this._files.push(new File(blob, fileName, options));
+        }
+        else {throw new TypeError(`第一引数はBlobかFileであるべきです。`)}
+    }
+    //encode(gzip=false) {
+    async encode() {
+        const tar = new Uint8Array(this._files.length * TarV7.BLOCK_SIZE + this._files.reduce((n, {size}) => n + size + TarV7.BLOCK_SIZE - size % TarV7.BLOCK_SIZE, 0) + TarV7.BLOCK_SIZE * 2);
+        const encoder = new TextEncoder();
+        for(let i = 0, j = 0; j < this._files.length; j++) {
+            tar.set(encoder.encode(this._files[j].name).subarray(0, 100), i);
+            i += 100;
+            tar.set(encoder.encode('0000644'), i);
+            i += 8;
+            tar.set(encoder.encode('0000000'), i);
+            i += 8;
+            tar.set(encoder.encode('0000000'), i);
+            i += 8;
+            tar.set(encoder.encode(this._files[j].size.toString(8).slice(0, 11).padStart(11, '0')), i);
+            i += 12;
+            tar.set(encoder.encode(Math.floor(this._files[j].lastModified / 1000).toString(8).slice(0, 11).padStart(11, '0')), i);
+            i += 12;
+            tar.set(encoder.encode('        '), i);
+            i += 8;
+            tar.set(encoder.encode('0'), i);
+            i += 1;
+            i += 100;
+            tar.set(encoder.encode('ustar  '), i);
+            i += 8;
+            i += 247;
+
+            tar.set(encoder.encode(`${tar.subarray(i - TarV7.BLOCK_SIZE, i).reduce((n, v) => n + v, 0).toString(8).slice(0, 6).padStart(6, "0")}\0 `), i - 364);
+
+            tar.set(await this._files[j].bytes(), i);
+            i += this._files[j].size + TarV7.BLOCK_SIZE - this._files[j].size % TarV7.BLOCK_SIZE;
+        }
+        return tar;
+//        return gzip ? await new Response(new Response(tar).body?.pipeThrough(new CompressionStream('gzip'))).bytes() : tar;
+    }
+    //decode(u8a, gzip=false) {// u8a:this.encode()
+    decode(tar) {// tar:this.encode()
+        if (!(tar instanceof Uint8Array)) {throw new TypeError(`引数はTar形式のUint8Array型インスタンスであるべきです。`)}
+        //const _tar = gzip ? await new Response(new Response(tar).body?.pipeThrough(new DecompressionStream('gzip'))).bytes() : tar;
+        const files = [];
+        const encoder = new TextEncoder();
+        const decoder = new TextDecoder();
+
+        for(let i = 0; i < _tar.byteLength;) {
+            if(i + TarV7.BLOCK_SIZE * 2 === _tar.byteLength && _tar.subarray(i).every((v) => v === 0x00)) {break;}
+
+            const name = decoder.decode(_tar.subarray(i, i += 100)).replaceAll('\0', '');
+            i += 8;
+            i += 8;
+            i += 8;
+            const size = parseInt(decoder.decode(_tar.subarray(i, i += 12)).slice(0, 11), 8);
+            const time = parseInt(decoder.decode(_tar.subarray(i, i += 12)).slice(0, 11), 8);
+            const checksum = decoder.decode(_tar.subarray(i, i += 8)).slice(0, 6);
+            const type = decoder.decode(_tar.subarray(i, i += 1));
+            i += 100;
+            const magic = decoder.decode(_tar.subarray(i, i += 8)).slice(0, 7);
+            i += 247;
+
+            if(!magic.startsWith('ustar')) {throw new ReferenceError('Invalid tar magic.');}
+
+            const header = _tar.slice(i - TarV7.BLOCK_SIZE, i);
+            header.set(encoder.encode('        '), TarV7.BLOCK_SIZE - 364);
+
+            if(checksum !== header.reduce((n, v) => n + v, 0).toString(8).slice(0, 6).padStart(6, '0')) {
+                throw new ReferenceError('Invalid tar checksum.');
+            }
+
+            if(type !== '0' && type !== '\0') {
+                i += size + TarV7.BLOCK_SIZE - size % TarV7.BLOCK_SIZE;
+                continue;
+            }
+
+            const body = _tar.subarray(i, i += size);
+            i += TarV7.BLOCK_SIZE - size % TarV7.BLOCK_SIZE;
+
+            files.push(new File([body], name, {
+                lastModified: time
+            }));
+        }
+        return files;
+    }
+}
+
+function download(blob, name='some.tar') {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    document.body.appendChild(a);
+    a.download = name || this.timestamp() + '.txt';
+    a.href = url;
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+const tar = new TarV7();
+console.log(new File(['aaaaaaa'], 'a.txt'))
+tar.addFile(new File(['aaaaaaa'], 'a.txt'));
+//tar.addFile(new File(['bbbbbbb'], 'dir/b.txt'));
+//tar.addFile(new File(['ccccccc'], 'dir/c.txt'));
+const blob = new Blob(await tar.encode());
+console.log(blob)
+download(blob);
+});
+</script>
