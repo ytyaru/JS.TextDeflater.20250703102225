@@ -2,6 +2,7 @@
 window.addEventListener('DOMContentLoaded', async(event)=>{
 //polifill
 Blob.prototype.bytes ??= async function() {return new Uint8Array(await this.arrayBuffer());}
+Response.prototype.bytes ??= async function() {return new Uint8Array(await this.arrayBuffer());}
 async function tarEncode(files, gzip) {
     const TAR_BLOCK_SIZE = 512;
 
@@ -94,7 +95,7 @@ async function tarDecode(tar, gzip) {
 
 
 
-function download(blob, name='some.tar') {
+function download(blob, name='some.tgz') {
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     document.body.appendChild(a);
@@ -115,7 +116,7 @@ const blob = new Blob(tar);
 console.log(blob)
 download(blob);
 
-
+console.log(await tarDecode(tar), true);
 
 
 
