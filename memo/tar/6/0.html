@@ -1,0 +1,60 @@
+<script src="tarball.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', async(event)=>{
+// polifill
+Blob.prototype.bytes ??= async function() {return new Uint8Array(await this.arrayBuffer());}
+Response.prototype.bytes ??= async function() {return new Uint8Array(await this.arrayBuffer());}
+function download(blob, name='some.tar') {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    document.body.appendChild(a);
+    a.download = name || this.timestamp() + '.txt';
+    a.href = url;
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+/*
+// Tar
+console.log(Tar);
+const writer = new Tar.Writer();
+writer.addBlob('a.txt', new File(['aaaaaaa'], 'a.txt'));
+writer.addBlob('dir/b.txt', new File(['bbbbbbb'], 'dir/b.txt'));
+writer.addBlob('dir/c.txt', new File(['ccccccc'], 'dir/c.txt', {type:'text/plain'}));
+writer.addBlob('dir/d.txt', new Blob(['ddddddd'], {type:'text/plain'}));
+console.log(writer.fileData)
+//const blob = await writer.writeBlob();
+const blob = await writer.toBlob();
+download(blob, 'some.tar');
+const reader = new Tar.Reader();
+await reader.fromFile(blob);
+console.log(reader.fileInfo)
+console.log(reader.fileInfo.map(info=>reader.getTextFile(info.name)));
+for (let file of reader.files) {
+    console.log(file)
+    console.log(file.name)
+    console.log(await file.text())
+}
+*/
+
+const writer = new Tgz.Writer();
+writer.addBlob('a.txt', new File(['aaaaaaa'], 'a.txt'));
+writer.addBlob('dir/b.txt', new File(['bbbbbbb'], 'dir/b.txt'));
+writer.addBlob('dir/c.txt', new File(['ccccccc'], 'dir/c.txt', {type:'text/plain'}));
+writer.addBlob('dir/d.txt', new Blob(['ddddddd'], {type:'text/plain'}));
+console.log(writer.fileData)
+//const blob = await writer.writeBlob();
+const blob = await writer.toBlob();
+download(blob, 'some.tgz');
+const reader = new Tgz.Reader();
+await reader.fromFile(blob);
+console.log(reader.fileInfo)
+console.log(reader.fileInfo.map(info=>reader.getTextFile(info.name)));
+for (let file of reader.files) {
+    console.log(file)
+    console.log(file.name)
+    console.log(await file.text())
+}
+
+});
+</script>
