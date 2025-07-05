@@ -1,0 +1,31 @@
+<script src="tarball.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', async(event)=>{
+// polifill
+Blob.prototype.bytes ??= async function() {return new Uint8Array(await this.arrayBuffer());}
+Response.prototype.bytes ??= async function() {return new Uint8Array(await this.arrayBuffer());}
+function download(blob, name='some.tar') {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    document.body.appendChild(a);
+    a.download = name || this.timestamp() + '.txt';
+    a.href = url;
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+}
+// Tar
+console.log(Tar);
+const writer = new Tar.Writer();
+writer.addFile('a.txt', new File(['aaaaaaa'], 'a.txt'));
+writer.addFile('dir/b.txt', new File(['bbbbbbb'], 'b.txt'));
+writer.addFile('dir/c.txt', new File(['ccccccc'], 'c.txt'));
+console.log(writer.fileData)
+const blob = await writer.writeBlob();
+download(blob, 'some.tar');
+const reader = new Tar.Reader();
+await reader.readFile(blob);
+console.log(reader.fileInfo)
+console.log(reader.fileInfo.map(info=>reader.getTextFile(info.name)));
+});
+</script>
